@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title><%= title %></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+     <link rel="stylesheet" href="/stylesheets/bootstrap.min.css" crossorigin="anonymous">
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <link rel="stylesheet" type="text/css" href="/stylesheets/dataTables.min.css"/>
+   
+    <script src="/javascripts/jquery.min.js"></script>
+    <script src="/javascripts/xlsx.core.min.js"></script>
+    <script type="text/javascript" src="javascripts/dataTables.min.js"></script>
+</head>
+  <body>
+    <h1><%= title %></h1>
+    <p>Welcome to <%= title %></p>  
+
+    <input type="file" id="files" name="files"/>
+
+    <select id='priceType'>
+        <option value="dealerPrice">Dealer Price</option>
+        <option value="mrp" selected="selected" >MRP</option>
+    </select>
+
+    <button type="button" id="createInvoice">Create Invoice</button>
+
+    <table id="printableArea">
+        <thead>
+            <tr>
+                <th>S.no</th>
+                <th>Product</th>
+                <th>DESCRIPTION</th>
+                <th>Model Number</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>TOTAL</th>
+            </tr>
+        </thead>
+        <tbody class="tbody">
+               
+        </tbody>
+    </table>
+    <p id="showData"></p>
+
+    <input type="button" onclick="printDiv('printableArea')" value="print Invoice!" />
+
+    <script>
+      var gst_val = 6;
+      var excelData;
+       //Change event to dropdownlist
+      $(document).ready(function(){
+        $('#files').change(handleFile);       
+      });
+
+      function handleFile(e) {
+        //Get the files from Upload control
+           var files = e.target.files;
+           var i, f;
+        //Loop through files
+           for (i = 0, f = files[i]; i != files.length; ++i) {
+               var reader = new FileReader();
+               var name = f.name;
+               reader.onload = function (e) {
+                   var data = e.target.result;  
+                   
+                   var workbook = XLSX.read(data, { type: 'binary' });
+                   
+                   var sheet_name_list = workbook.SheetNames;
+                   sheet_name_list.forEach(function (y) { /* iterate through sheets */
+                       //Convert the cell value to Json
+                       var roa = XLSX.utils.sheet_to_json(workbook.Sheets[y]);
+                       if (roa.length > 0) {
+                        excelData = roa;
+                       }
+                   });
+                  //Get the first column first cell value
+                  console.log(excelData);
+                  
+
+                   //alert(result[0].Column1);
+               };
+               reader.readAsArrayBuffer(f);
+             }
+           }
+           
+       
+    $("#createInvoice").on('click',function(){
+        CreateTableFromJSON(excelData)
+    }) 
+
+       function CreateTableFromJSON(data) {
+            $(".tbody").empty();
+            var showedPrice = $( "#priceType option:selected" ).val();
+            for (var i = 0; i < data.length; i++) {
+                var index = parseInt(i)+1;                
+                $(".tbody").append( "<tr id='row"+i+"'>"+
+                "<td id='index"+i+"'>"+index+"</td>"+
+                "<td class='product' name='product["+i+"]' id='product"+i+"' >"+excelData[i].product+"</td>"+
+                "<td class='desc' name='description["+i+"]' id='description"+i+"'>"+excelData[i].description+"</td>"+
+                "<td class='unit'  name='modelNumber["+i+"]' id='modelNumber"+i+"'>"+excelData[i].modelNumber+"</td>"+
+                "<td class='price' name='price["+i+"]' id='price"+i+"'>"+excelData[i][showedPrice]+"</td>"+
+                "<td class='quantity'><input style='text-align: center;' class='border' type='number' onfocusout='showTotal("+i+")'  name='quantity["+i+"]' id='quantity"+i+"'/></td>"+
+                "<td ><label id='total_label"+i+"'>0</label> <input type='hidden' name='total["+i+"]' class='final_grand_total' value='0' id='total_label_hidden"+i+"'/></td>"+
+            "</tr>");
+
+            
+
+            }
+            $(".tbody").append( "<tr >"+
+                    "<td style='display: none;'></td>"+
+                    "<td style='display: none;'></td>"+
+                    "<td style='display: none;'></td>"+
+                    "<td style='display: none;'></td>"+
+                    "<td style='display: none;'></td>"+
+                                    "<td colspan='6' class='grand' style='text-align:right'>GST</td>"+
+                                    "<td class='grand gst'>"+gst_val+" %</td>"+
+                                "</tr>"+
+                                "<tr>"+
+                                        "<td style='display: none;'></td>"+
+                    "<td style='display: none;'></td>"+
+                    "<td style='display: none;'></td>"+
+                    "<td style='display: none;'></td>"+
+                    "<td style='display: none;'></td>"+
+                                   "<td colspan='6' class='' style='text-align:right'>GRAND TOTAL</td>"+
+                                   "<td class='total' id='all_total'>00</td><input type='hidden' name='grand_total' value='51520' id='all_total_hidden'>"+
+                                "</tr>");
+        //                         setTimeout(function(){ 
+        //                             $('#printableArea').DataTable( {
+        //     dom: 'Bfrtip',
+        //     buttons: [
+        //         'print'
+        //     ]
+        // } ); }, 3000);
+       
+        }
+       
+       
+        var printRows = [];
+        function showTotal(counter){
+        $('input').css('border',"0");
+        var quantity = $("#quantity"+counter).val();
+        $("#quantity"+counter).attr('value', quantity);
+        if(quantity === "0" ||quantity === ""){
+            printRows.splice($.inArray(counter, printRows),1);
+            quantity = "0";
+        }
+        else{
+            printRows.push(counter);
+        }
+        
+        var price = $("#price"+counter).html();
+        // var sgst = $("#sgst"+counter).is(":checked");
+        // var cgst = $("#cgst"+counter).is(":checked");
+       
+        console.log(quantity, price);
+        if(price>0){
+            var final_amt = 0;
+            var total = parseInt(quantity) * parseInt(price) * (parseInt(gst_val) * 0.1);            
+            var grand_total_row = total.toFixed(0) ;
+            $("#total_label"+counter).text(grand_total_row);
+            $("#total_label_hidden"+counter).val(grand_total_row);
+            
+            let t_count =0;
+            $.each($(".final_grand_total"), function(){                
+                final_amt += parseInt($(this).val());               
+            });
+            $("#all_total").text(final_amt);
+            $("#all_total_hidden").val(final_amt);
+        }
+    }
+    
+    function printDiv(divName) {
+    //  var printContents = document.getElementById(divName).innerHTML;
+    //  var originalContents = document.body.innerHTML;
+
+    //  document.body.innerHTML = printContents;
+
+    // window.print();
+    //  document.body.innerHTML = originalContents;
+    for (var i = 0; i < excelData.length; i++) {
+            if(jQuery.inArray(i, printRows) != -1) {
+               
+            }
+            else {
+                $("#row"+i).remove()
+            } 
+    }
+           $('table tbody tr').each(function(idx){
+               // $("#index"+idx).empty();
+               $(this).children().first().html(idx + 1);
+            });
+        var divToPrint = document.getElementById('printableArea');
+        var htmlToPrint = '' +
+        '<style type="text/css">' +
+           'table  {width:100%}' +
+           'table th {color: #5D6975;  border-bottom: 1px solid #C1CED9;  white-space: nowrap;  font-weight: bold;}'+   
+           'table th, table td {text-align: center;}' +
+           'table td.grand {border-top: 1px solid #5D6975}' +
+        '</style>';
+
+        htmlToPrint += divToPrint.outerHTML;
+        newWin = window.open();
+        newWin.document.write(htmlToPrint);
+        newWin.print();
+        newWin.close();
+        printRows = []
+   }
+  
+   </script>
+
+   
+  </body>
+</html>
